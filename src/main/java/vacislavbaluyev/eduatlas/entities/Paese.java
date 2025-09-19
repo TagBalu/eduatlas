@@ -20,8 +20,8 @@ public class Paese {
     private Long id;
 
     @Column(nullable = false,unique = true)
-    private String nome;
+    protected String nome;
 
     @Column(name = "anniScuolaObbligatoria")
-    private Integer anniSculaObbligaroia;
+    protected Integer anniSculaObbligaroia;
 }

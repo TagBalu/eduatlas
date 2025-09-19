@@ -1,21 +1,24 @@
 package vacislavbaluyev.eduatlas.runner;
 
-import jakarta.transaction.Transactional;
+
+import org.springframework.transaction.annotation.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import vacislavbaluyev.eduatlas.entities.NotaPaese;
 import vacislavbaluyev.eduatlas.entities.Paese;
 import vacislavbaluyev.eduatlas.entities.SistemaUniversitario;
-import vacislavbaluyev.eduatlas.repository.NotaPaeseRepository;
+import vacislavbaluyev.eduatlas.entities.Utente;
 import vacislavbaluyev.eduatlas.repository.PaeseRepository;
 import vacislavbaluyev.eduatlas.repository.SistemaUniversitarioRepository;
+import vacislavbaluyev.eduatlas.repository.UtenteRepository;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 @Component
 @Slf4j
@@ -23,23 +26,27 @@ public class CsvDataRunner implements CommandLineRunner {
 
     private final PaeseRepository paeseRepository;
     private final SistemaUniversitarioRepository sistemaUniversitarioRepository;
-    private final NotaPaeseRepository notaPaeseRepository;
+    private final UtenteRepository utenteRepository;
+    private final PasswordEncoder passwordEncoder;
     private static final String CSV_FILE_PATH = "MATRIXCSV.csv";
 
     @Autowired
     public CsvDataRunner(PaeseRepository paeseRepository,
                          SistemaUniversitarioRepository sistemaUniversitarioRepository,
-                         NotaPaeseRepository notaPaeseRepository) { // Aggiungi al costruttore
+                         UtenteRepository utenteRepository,
+                         PasswordEncoder passwordEncoder) {
         this.paeseRepository = paeseRepository;
         this.sistemaUniversitarioRepository = sistemaUniversitarioRepository;
-        this.notaPaeseRepository = notaPaeseRepository;
+        this.utenteRepository = utenteRepository;
+        this.passwordEncoder = passwordEncoder;
     }
-
 
     @Override
     @Transactional
     public void run(String... args) {
         try {
+            initializeRootAdmin();
+
             if (paeseRepository.count() > 0) {
                 log.info("Il database contiene già dei dati. Saltando l'importazione CSV.");
                 return;
@@ -50,7 +57,7 @@ public class CsvDataRunner implements CommandLineRunner {
             log.info("Importazione CSV completata con successo.");
 
         } catch (Exception e) {
-            log.error("Errore durante l'importazione del CSV: {}", e.getMessage(), e);
+            log.error("Errore durante l'inizializzazione: {}", e.getMessage(), e);
         }
     }
 
@@ -66,7 +73,7 @@ public class CsvDataRunner implements CommandLineRunner {
 
             String line;
             while ((line = br.readLine()) != null) {
-                if (line.trim().isEmpty() || line.startsWith(";")) {
+                if (line.trim().isEmpty()) {
                     continue;
                 }
                 processCSVLine(line);
@@ -79,79 +86,61 @@ public class CsvDataRunner implements CommandLineRunner {
     }
 
     private void processCSVLine(String line) {
-        String[] values = line.split(";");
-        // Verifica che ci siano abbastanza colonne
-        if (values.length < 17) {
-            log.warn("Riga CSV non valida (colonne insufficienti): {}", line);
+        String[] values = line.split(";(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
+        values = Arrays.stream(values)
+                .map(this::cleanValue)
+                .toArray(String[]::new);
+
+        if (values.length < 1 || values[0].trim().isEmpty()) {
             return;
         }
 
         try {
-            // Elabora il nome del paese (rimuovi spazi extra)
             String nomePaese = values[0].trim();
 
-            // Elabora gli anni di scuola obbligatoria
-            Integer anniScuola = parseAnniScuola(values[1]);
-
-            // Crea e salva l'entità Paese
             Paese paese = Paese.builder()
                     .nome(nomePaese)
-                    .anniSculaObbligaroia(anniScuola)
+                    .anniSculaObbligaroia(values.length > 1 ? parseAnniScuola(values[1]) : null)
                     .build();
             paese = paeseRepository.save(paese);
 
-            // Elabora i dati del sistema universitario
-            Integer durataBaseAnni = calcolaDurataBase(values);
-            Integer creditiPerAnno = parseCrediti(values[7]);
-            String livelloEQF = values.length > 16 ? values[16].trim() : null;
-
-            // Crea e salva il sistema universitario
-            SistemaUniversitario sistema = SistemaUniversitario.builder()
-                    .paese(paese)
-                    .durataBaseAnni(durataBaseAnni)
-                    .creditiPerAnno(creditiPerAnno)
-                    .livelloEQF(livelloEQF)
-                    .build();
-            sistemaUniversitarioRepository.save(sistema);
-
-            processaNotePerPaese(values, paese);
+            if (values.length > 7) {
+                processSistemaUniversitario(values, paese);
+            }
 
             log.debug("Importati dati per il paese: {}", nomePaese);
 
         } catch (Exception e) {
-            log.error("Errore nell'elaborazione della riga CSV: {}", line, e);
+            log.error("Errore nell'elaborazione della riga CSV per il paese {}: {}",
+                    values[0], e.getMessage());
         }
     }
 
+    private void processSistemaUniversitario(String[] values, Paese paese) {
+        Integer durataBaseAnni = calcolaDurataBase(values);
+        Integer creditiPerAnno = parseCrediti(values[7]);
+        String livelloEQF = values.length > 16 ? values[16].trim() : null;
 
-
-    private void processaNotePerPaese(String[] values, Paese paese) {
-        for (int i = 0; i < values.length; i++) {
-            String value = values[i].trim();
-            if (value.contains("*")) {
-                for (int j = i + 1; j < values.length; j++) {
-                    String potentialNote = values[j].trim();
-                    if (potentialNote.startsWith("*") || potentialNote.startsWith("(*)")) {
-                        NotaPaese nota = NotaPaese.builder()
-                                .paese(paese)
-                                .nota(potentialNote.replaceAll("^[*(]\\*[)]*", "").trim())
-                                .colonnaRifermineto(i)
-                                .build();
-                        notaPaeseRepository.save(nota); // Usa l'istanza iniettata
-                        log.debug("Salvata nota per il paese {} colonna {}: {}",
-                                paese.getNome(), i, nota.getNota());
-                        break;
-                    }
-                }
-            }
-        }
+        SistemaUniversitario sistema = SistemaUniversitario.builder()
+                .paese(paese)
+                .durataBaseAnni(durataBaseAnni)
+                .creditiPerAnno(creditiPerAnno)
+                .livelloEQF(livelloEQF)
+                .build();
+        sistemaUniversitarioRepository.save(sistema);
     }
 
-
+    private String cleanValue(String value) {
+        if (value == null) return "";
+        value = value.trim();
+        if (value.startsWith("\"") && value.endsWith("\"")) {
+            value = value.substring(1, value.length() - 1);
+        }
+        return value.replace("\"\"", "\"");
+    }
 
     private Integer parseAnniScuola(String value) {
         try {
-            // Gestisce casi come "12" o "12|13*"
             String[] parts = value.split("\\|");
             String anni = parts[0].replaceAll("[^0-9]", "");
             return Integer.parseInt(anni);
@@ -163,7 +152,6 @@ public class CsvDataRunner implements CommandLineRunner {
 
     private Integer calcolaDurataBase(String[] values) {
         try {
-            // Cerca il primo valore non vuoto tra gli anni di durata (indici 2-4)
             for (int i = 2; i <= 4; i++) {
                 if (!values[i].trim().isEmpty()) {
                     String durataStr = values[i].replaceAll("[^0-9]", "");
@@ -186,5 +174,29 @@ public class CsvDataRunner implements CommandLineRunner {
             log.warn("Errore nel parsing dei crediti: {}", value);
         }
         return null;
+    }
+
+    private void initializeRootAdmin() {
+        log.info("Verifico la presenza dell'utente admin root...");
+        if (utenteRepository.count() == 0) {
+            log.info("Creazione utente admin root...");
+
+            String encodedPassword = passwordEncoder.encode("adminRoot123!");
+
+            Utente adminRoot = Utente.builder()
+                    .username("admin")
+                    .email("admin@eduatlas.com")
+                    .password(encodedPassword)
+                    .nome("Admin")
+                    .avatarUrl("https://ui-avatars.com/api/?name=Admin")
+                    .isRootAdmin(true)
+                    .isAdmin(true)
+                    .build();
+
+            utenteRepository.save(adminRoot);
+            log.info("Utente admin root creato con successo");
+        } else {
+            log.info("Utenti già presenti nel sistema");
+        }
     }
 }

@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
@@ -12,6 +13,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Getter
 public class Paese {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,6 +22,6 @@ public class Paese {
     @Column(nullable = false,unique = true)
     private String nome;
 
-    @Column(name = "anniSculaObbligaroia")
+    @Column(name = "anniScuolaObbligatoria")
     private Integer anniSculaObbligaroia;
 }

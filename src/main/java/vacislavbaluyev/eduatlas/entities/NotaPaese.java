@@ -2,9 +2,17 @@ package vacislavbaluyev.eduatlas.entities;
 
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "notaPaese")
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
 
 public class NotaPaese {
 
@@ -19,7 +27,7 @@ public class NotaPaese {
     @Column(name = "nota", nullable = false)
     private String nota;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipoNota")
-    private TipoNotaEnum topoNota;
+
+    @Column(name = "colonnaRifermineto")
+    private int colonnaRifermineto;
 }

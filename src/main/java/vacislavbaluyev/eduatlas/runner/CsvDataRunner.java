@@ -152,16 +152,23 @@ public class CsvDataRunner implements CommandLineRunner {
 
     private Integer calcolaDurataBase(String[] values) {
         try {
-            for (int i = 2; i <= 4; i++) {
-                if (!values[i].trim().isEmpty()) {
+            for (int i = 4; i <= 6; i++) {
+                if (values.length > i && !values[i].trim().isEmpty()) {
                     String durataStr = values[i].replaceAll("[^0-9]", "");
-                    return Integer.parseInt(durataStr);
+                    if (!durataStr.isEmpty()) {
+                        int durata = Integer.parseInt(durataStr);
+                        if (durata >= 3 && durata <= 5) {
+                            return durata;
+                        }
+                    }
                 }
             }
+            log.debug("Nessuna durata base valida trovata");
         } catch (Exception e) {
-            log.warn("Errore nel calcolo della durata base");
+            log.warn("Errore nel calcolo della durata base: {}", e.getMessage());
         }
         return null;
+
     }
 
     private Integer parseCrediti(String value) {

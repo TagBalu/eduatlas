@@ -33,10 +33,8 @@ public class Utente {
 
     private String avatarUrl;
 
-
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Boolean isRootAdmin= false; // flag per l'admin principale che può creare altri admin
+    private Ruolo ruolo;
 
-    @Column(nullable = false)
-    private Boolean isAdmin= true; // tutti gli utenti saranno admin
 }

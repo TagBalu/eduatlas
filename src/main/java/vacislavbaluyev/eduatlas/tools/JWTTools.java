@@ -35,7 +35,7 @@ public class JWTTools {
         }
     }
 
-    public String extractIdFromToken(String accessToken) {
+    public String extractSubject(String accessToken) {
         return Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secret.getBytes())).build().parseSignedClaims(accessToken).getPayload().getSubject();
 
     }

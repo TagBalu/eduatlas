@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import vacislavbaluyev.eduatlas.entities.Ruolo;
 import vacislavbaluyev.eduatlas.entities.Utente;
 import vacislavbaluyev.eduatlas.repository.PaeseRepository;
 import vacislavbaluyev.eduatlas.repository.UtenteRepository;
@@ -80,8 +81,7 @@ public class CsvDataRunner implements CommandLineRunner {
                     .nome("Admin")
                     .cognome("Principal")
                     .avatarUrl("https://ui-avatars.com/api/?name=Admin")
-                    .isRootAdmin(true)
-                    .isAdmin(true)
+                    .ruolo(Ruolo.ROOT_ADMIN)
                     .build();
 
             utenteRepository.save(adminRoot);

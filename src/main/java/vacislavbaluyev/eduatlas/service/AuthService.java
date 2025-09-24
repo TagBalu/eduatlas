@@ -3,7 +3,6 @@ package vacislavbaluyev.eduatlas.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import vacislavbaluyev.eduatlas.entities.Ruolo;
@@ -13,9 +12,10 @@ import vacislavbaluyev.eduatlas.exception.UnauthorizedOperationException;
 import vacislavbaluyev.eduatlas.exception.UserAlreadyExistsException;
 import vacislavbaluyev.eduatlas.payload.AdminCreationDTO;
 import vacislavbaluyev.eduatlas.payload.LoginDTO;
-import vacislavbaluyev.eduatlas.payload.RegistrazioneDTO;
+import vacislavbaluyev.eduatlas.payload.LoginResponseDTO;
 import vacislavbaluyev.eduatlas.repository.UtenteRepository;
 import vacislavbaluyev.eduatlas.tools.JWTTools;
+
 
 @Service
 @Slf4j
@@ -26,33 +26,32 @@ public class AuthService {
     private final JWTTools jwtTools;
 
     public AuthService(UtenteRepository utenteRepository,
-                      PasswordEncoder passwordEncoder,
-                      AuthenticationManager authenticationManager,
-                      JWTTools jwtTools) {
+                       PasswordEncoder passwordEncoder,
+                       AuthenticationManager authenticationManager,
+                       JWTTools jwtTools) {
         this.utenteRepository = utenteRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtTools = jwtTools;
     }
 
-    public String authenticateUser(LoginDTO loginDto) {
+    public LoginResponseDTO login(LoginDTO loginDto) {
         // Autenticazione dell'utente
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginDto.username(), loginDto.password())
         );
-        
+
         // Recupero dell'utente e generazione token
         Utente utente = utenteRepository.findByUsername(loginDto.username())
                 .orElseThrow(() -> new ResourceNotFoundException("Utente non trovato"));
-        return jwtTools.generateToken(utente);
-    }
 
-    public void registerUser(RegistrazioneDTO registrazioneDto) {
-        checkUserExists(registrazioneDto.username(), registrazioneDto.email());
+        String token = jwtTools.generateToken(utente);
 
-        Utente utente = buildUser(registrazioneDto, Ruolo.ADMIN);
-        utenteRepository.save(utente);
-        log.info("Nuovo admin registrato: {}", utente.getUsername());
+        return new LoginResponseDTO(
+                token,
+                utente.getUsername(),
+                utente.getEmail()
+        );
     }
 
     public void createAdmin(AdminCreationDTO adminDto, String requestingUsername) {
@@ -79,7 +78,7 @@ public class AuthService {
         }
     }
 
-    private Utente buildUser(RegistrazioneDTO dto, Ruolo ruolo) {
+    private Utente buildUser(AdminCreationDTO dto, Ruolo ruolo) {
         return Utente.builder()
                 .username(dto.username())
                 .email(dto.email())
@@ -93,17 +92,5 @@ public class AuthService {
 
     private String generateAvatarUrl(String nome, String cognome) {
         return "https://ui-avatars.com/api/?name=" + nome + "+" + cognome;
-    }
-    
-    private Utente buildUser(AdminCreationDTO dto, Ruolo ruolo) {
-        return Utente.builder()
-                .username(dto.username())
-                .email(dto.email())
-                .password(passwordEncoder.encode(dto.password()))
-                .nome(dto.nome())
-                .cognome(dto.cognome())
-                .ruolo(ruolo)
-                .avatarUrl(generateAvatarUrl(dto.nome(), dto.cognome()))
-                .build();
     }
 }

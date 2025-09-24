@@ -31,50 +31,74 @@ public class JWTAuthFilter extends OncePerRequestFilter {
     @Autowired
     private UtenteService utenteService;
 
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            response.setStatus(HttpServletResponse.SC_OK);
+        String authHeader = request.getHeader("Authorization");
+
+        // Se il percorso è pubblico o non richiede autenticazione, procedi senza token
+        if (shouldNotFilter(request)) {
+            filterChain.doFilter(request, response);
             return;
         }
 
-        String authHeader = request.getHeader("Authorization");
+        // Verifica se l'header Authorization è presente e nel formato corretto
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new UnauthorizedOperationException("Per favore inserisci il token nell'Authorization Header nel formato corretto!");
         }
 
-        String accessToken = authHeader.replace("Bearer ", "");
+        try {
+            String accessToken = authHeader.replace("Bearer ", "");
 
-        // Verifica il token
-        jwtTools.verifyToken(accessToken); // Usa il metodo della tua classe JWTTools
+            // Verifica il token
+            jwtTools.verifyToken(accessToken);
 
-        // Estrae lo username dal token
-        String username = jwtTools.extractSubject(accessToken); // Usa il metodo della tua classe JWTTools
+            // Estrae lo username dal token
+            String username = jwtTools.extractSubject(accessToken);
 
-        // Recupera l'utente dal database
-        UtenteDTO currentUser = utenteService.getUserByUsername(username);
+            // Recupera l'utente dal database
+            UtenteDTO currentUser = utenteService.getUserByUsername(username);
 
-        // Crea l'oggetto Authentication
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                username,
-                null,
-                currentUser.isAdmin() ?
-                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) :
-                        List.of(new SimpleGrantedAuthority("ROLE_USER"))
-        );
+            // Crea l'oggetto Authentication con i ruoli appropriati
+            List<SimpleGrantedAuthority> authorities;
+            if (currentUser.isAdmin()) {
+                authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+            } else {
+                authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+            }
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    username,
+                    null,
+                    authorities
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        } catch (Exception e) {
+            log.error("Errore durante l'autenticazione: {}", e.getMessage());
+            throw new UnauthorizedOperationException("Token non valido o scaduto");
+        }
 
         filterChain.doFilter(request, response);
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return "OPTIONS".equalsIgnoreCase(request.getMethod()) ||
-                new AntPathMatcher().match("/api/auth/**", request.getServletPath());
+        // Gestione delle richieste OPTIONS
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        String path = request.getServletPath();
+
+        // Lista dei percorsi pubblici
+        return pathMatcher.match("/api/auth/**", path) ||
+                (pathMatcher.match("/api/paesi/**", path) && "GET".equalsIgnoreCase(request.getMethod()));
     }
 }

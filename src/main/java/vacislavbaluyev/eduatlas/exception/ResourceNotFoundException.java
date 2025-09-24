@@ -5,9 +5,11 @@ public class ResourceNotFoundException extends RuntimeException {
         super(message);
     }
 
-    public ResourceNotFoundException(String sistemaValutazione, String paese, String nome) {
+    public ResourceNotFoundException(String resource, String field, String value) {
+        super(String.format("%s not found with %s = %s", resource, field, value));
     }
 
-    public ResourceNotFoundException(String sistemaValutazione, String id, Long id1) {
+    public ResourceNotFoundException(String resource, String field, Long value) {
+        super(String.format("%s not found with %s = %d", resource, field, value));
     }
 }

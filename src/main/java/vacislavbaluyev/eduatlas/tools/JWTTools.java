@@ -17,7 +17,7 @@ public class JWTTools {
     private String secret;
 
 
-    public String createToken(Utente utente){
+    public String generateToken(Utente utente){
 
         return Jwts.builder()
                 .issuedAt(new Date(System.currentTimeMillis()))

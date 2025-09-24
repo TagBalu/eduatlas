@@ -23,6 +23,4 @@ public class TitoloStudio {
    @Column(name = "denominazione", nullable = false)
     private String denominazione;
 
-   @Column(name = "lingua")
-    private String lingua;
 }

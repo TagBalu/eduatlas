@@ -26,9 +26,9 @@ public class AuthService {
     private final JWTTools jwtTools;
 
     public AuthService(UtenteRepository utenteRepository,
-                       PasswordEncoder passwordEncoder,
-                       AuthenticationManager authenticationManager,
-                       JWTTools jwtTools) {
+                      PasswordEncoder passwordEncoder,
+                      AuthenticationManager authenticationManager,
+                      JWTTools jwtTools) {
         this.utenteRepository = utenteRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
@@ -36,10 +36,15 @@ public class AuthService {
     }
 
     public String authenticateUser(LoginDTO loginDto) {
-        Authentication authentication = authenticationManager.authenticate(
+        // Autenticazione dell'utente
+        authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginDto.username(), loginDto.password())
         );
-        return jwtTools.generateToken(authentication);
+        
+        // Recupero dell'utente e generazione token
+        Utente utente = utenteRepository.findByUsername(loginDto.username())
+                .orElseThrow(() -> new ResourceNotFoundException("Utente non trovato"));
+        return jwtTools.generateToken(utente);
     }
 
     public void registerUser(RegistrazioneDTO registrazioneDto) {
@@ -47,7 +52,7 @@ public class AuthService {
 
         Utente utente = buildUser(registrazioneDto, Ruolo.ADMIN);
         utenteRepository.save(utente);
-        log.info("Nuovo utente registrato: {}", utente.getUsername());
+        log.info("Nuovo admin registrato: {}", utente.getUsername());
     }
 
     public void createAdmin(AdminCreationDTO adminDto, String requestingUsername) {
@@ -88,5 +93,17 @@ public class AuthService {
 
     private String generateAvatarUrl(String nome, String cognome) {
         return "https://ui-avatars.com/api/?name=" + nome + "+" + cognome;
+    }
+    
+    private Utente buildUser(AdminCreationDTO dto, Ruolo ruolo) {
+        return Utente.builder()
+                .username(dto.username())
+                .email(dto.email())
+                .password(passwordEncoder.encode(dto.password()))
+                .nome(dto.nome())
+                .cognome(dto.cognome())
+                .ruolo(ruolo)
+                .avatarUrl(generateAvatarUrl(dto.nome(), dto.cognome()))
+                .build();
     }
 }

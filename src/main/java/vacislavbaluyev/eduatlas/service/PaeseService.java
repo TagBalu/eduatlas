@@ -8,6 +8,7 @@ import vacislavbaluyev.eduatlas.entities.SistemaUniversitario;
 import vacislavbaluyev.eduatlas.entities.SistemaValutazione;
 import vacislavbaluyev.eduatlas.exception.ResourceNotFoundException;
 import vacislavbaluyev.eduatlas.payload.DettaglioPaeseDTO;
+import vacislavbaluyev.eduatlas.payload.PaeseCompletoCreateDTO;
 import vacislavbaluyev.eduatlas.payload.PaeseCreateDTO;
 import vacislavbaluyev.eduatlas.repository.PaeseRepository;
 import vacislavbaluyev.eduatlas.repository.SistemaUniversitarioRepository;
@@ -24,31 +25,27 @@ public class PaeseService {
     private final PaeseRepository paeseRepository;
     private final SistemaValutazioneRepository sistemaValutazioneRepository;
     private final SistemaUniversitarioRepository sistemaUniversitarioRepository;
+    private final PaeseCompletoService paeseCompletoService;
 
     public PaeseService(
             PaeseRepository paeseRepository,
             SistemaValutazioneRepository sistemaValutazioneRepository,
-            SistemaUniversitarioRepository sistemaUniversitarioRepository) {
+            SistemaUniversitarioRepository sistemaUniversitarioRepository, PaeseCompletoService paeseCompletoService) {
         this.paeseRepository = paeseRepository;
         this.sistemaValutazioneRepository = sistemaValutazioneRepository;
         this.sistemaUniversitarioRepository = sistemaUniversitarioRepository;
+        this.paeseCompletoService = paeseCompletoService;
     }
 
     public List<DettaglioPaeseDTO> getAllPaesi() {
         return paeseRepository.findAll().stream()
                 .map(paese -> {
                     try {
-                        SistemaValutazione sistemaVal = sistemaValutazioneRepository.findByPaese(paese)
-                                .orElse(null);
-                        SistemaUniversitario sistemaUni = sistemaUniversitarioRepository.findByPaeseId(paese.getId())
-                                .orElse(null);
-                        if (sistemaVal != null && sistemaUni != null) {
-                            return DettaglioPaeseDTO.fromEntities(paese, sistemaVal, sistemaUni);
-                        }
+                        return getPaeseById(paese.getId());
                     } catch (Exception e) {
                         log.error("Errore nel recupero dei dati per il paese {}: {}", paese.getNome(), e.getMessage());
+                        return null;
                     }
-                    return null;
                 })
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
@@ -66,6 +63,7 @@ public class PaeseService {
 
         return DettaglioPaeseDTO.fromEntities(paese, sistemaVal, sistemaUni);
     }
+
 
     public DettaglioPaeseDTO getPaeseByNome(String nome) {
         Paese paese = paeseRepository.findByNome(nome)
@@ -130,24 +128,21 @@ public class PaeseService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public DettaglioPaeseDTO createPaese(PaeseCreateDTO createDTO) {
-        if (paeseRepository.existsByNome(createDTO.nome())) {
-            throw new IllegalArgumentException("Un paese con questo nome esiste già");
-        }
+        // Convertiamo PaeseCreateDTO in PaeseCompletoCreateDTO
+        PaeseCompletoCreateDTO completeDTO = new PaeseCompletoCreateDTO(
+                createDTO.nome(),
+                createDTO.anniScuolaObbligatoria(),
+                null, null, null, null,  // sistema valutazione vuoto
+                null, null, null        // sistema universitario vuoto
+        );
 
-        Paese paese = Paese.builder()
-                .nome(createDTO.nome())
-                .anniSculaObbligaroia(createDTO.anniScuolaObbligatoria())
-                .build();
-
-        paese = paeseRepository.save(paese);
-
-
+        Paese paese = paeseCompletoService.createPaeseCompleto(completeDTO);
         return getPaeseById(paese.getId());
     }
 
-
-
+    @Transactional
     public void deletePaese(Long id) {
         if (!paeseRepository.existsById(id)) {
             throw new ResourceNotFoundException("Paese", "id", id);

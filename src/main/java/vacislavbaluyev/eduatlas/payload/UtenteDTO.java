@@ -11,4 +11,7 @@ public record UtenteDTO(
         String cognome,
         String avatarUrl,
         Ruolo ruolo
-) {}
+) {public boolean isAdmin() {
+    return ruolo == Ruolo.ADMIN;
+}
+}

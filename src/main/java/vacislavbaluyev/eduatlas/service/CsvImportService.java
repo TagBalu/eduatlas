@@ -5,7 +5,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vacislavbaluyev.eduatlas.entities.*;
 import vacislavbaluyev.eduatlas.exception.CsvImportException;
-import vacislavbaluyev.eduatlas.repository.*;
+import vacislavbaluyev.eduatlas.repository.PaeseRepository;
+import vacislavbaluyev.eduatlas.repository.SistemaUniversitarioRepository;
+import vacislavbaluyev.eduatlas.repository.SistemaValutazioneRepository;
+import vacislavbaluyev.eduatlas.repository.TitoloStudioRepository;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -14,62 +17,87 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-@Service
 @Slf4j
-public class CsvImportService{
-    private static final int EXPECTED_COLUMNS = 19;
+@Service
+public class CsvImportService {
+    private static final int EXPECTED_COLUMNS = 19;  // Corretto a 19 colonne
     
     private final PaeseRepository paeseRepository;
     private final SistemaUniversitarioRepository sistemaUniversitarioRepository;
     private final SistemaValutazioneRepository sistemaValutazioneRepository;
+    private final TitoloStudioRepository titoloStudioRepository;
 
     public CsvImportService(PaeseRepository paeseRepository,
-                           SistemaUniversitarioRepository sistemaUniversitarioRepository,
-                           SistemaValutazioneRepository sistemaValutazioneRepository) {
+                            SistemaUniversitarioRepository sistemaUniversitarioRepository,
+                            SistemaValutazioneRepository sistemaValutazioneRepository, TitoloStudioRepository titoloStudioRepository) {
         this.paeseRepository = paeseRepository;
         this.sistemaUniversitarioRepository = sistemaUniversitarioRepository;
         this.sistemaValutazioneRepository = sistemaValutazioneRepository;
+        this.titoloStudioRepository = titoloStudioRepository;
     }
-
 
     @Transactional
     public void importCsvData(InputStream inputStream) throws IOException {
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-            
-            // Valida l'header del CSV
-            validateHeader(br.readLine(), br.readLine());
-            
+
+            // Salta le prime due righe (header)
+            br.readLine(); // Salta la prima riga di intestazione
+            br.readLine(); // Salta la seconda riga di intestazione
+
             String line;
-            int lineNumber = 2;
+            int lineNumber = 3; // Iniziamo da 3 perché abbiamo saltato due righe
+
             while ((line = br.readLine()) != null) {
                 if (!line.trim().isEmpty()) {
                     try {
-                        processCSVLine(line);
+                        String[] values = parseCsvLine(line);
+                        validateLine(values, lineNumber);
+                        processCSVLine(values);
+                        log.debug("Riga {} processata con successo", lineNumber);
                     } catch (Exception e) {
+                        log.error("Errore alla riga {}: {}", lineNumber, e.getMessage());
                         throw new CsvImportException("Errore alla riga " + lineNumber + ": " + e.getMessage());
                     }
                 }
                 lineNumber++;
             }
+
+            log.info("Importazione completata con successo");
         }
     }
 
 
-    private void validateHeader(String headerLine1, String headerLine2) {
-        if (headerLine1 == null || headerLine2 == null) {
-            throw new CsvImportException("Header CSV mancante");
+    private void validateLine(String[] values, int lineNumber) {
+        if (values.length != EXPECTED_COLUMNS) {
+            throw new CsvImportException(String.format(
+                "Riga %d: numero di colonne errato. Attese %d colonne, trovate %d",
+                lineNumber, EXPECTED_COLUMNS, values.length));
+        }
+
+        // Validazione dei valori obbligatori
+        if (values[0].trim().isEmpty()) {
+            throw new CsvImportException(String.format(
+                "Riga %d: Nome paese mancante", lineNumber));
         }
     }
 
-    private void processCSVLine(String line) {
-        String[] values = parseCsvLine(line);
-        validateValues(values);
+    private String[] parseCsvLine(String line) {
+        String[] allValues = line.split(";(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
+        // Prendiamo solo le prime 19 colonne
+        String[] values = Arrays.copyOf(allValues, EXPECTED_COLUMNS);
+        return Arrays.stream(values)
+                .map(this::cleanValue)
+                .toArray(String[]::new);
+    }
 
+
+    private void processCSVLine(String[] values) {
         try {
             Paese paese = creaPaese(values);
             creaSistemaValutazione(values, paese);
             creaSistemaUniversitario(values, paese);
+            creaTitoloStudio(values,paese);
             log.debug("Importati dati completi per il paese: {}", paese.getNome());
         } catch (Exception e) {
             throw new CsvImportException("Errore nell'elaborazione dei dati per il paese " + 
@@ -77,18 +105,20 @@ public class CsvImportService{
         }
     }
 
-    private String[] parseCsvLine(String line) {
-        String[] values = line.split(";(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1);
-        return Arrays.stream(values)
-                .map(this::cleanValue)
-                .toArray(String[]::new);
-    }
+    private void creaTitoloStudio(String[] values, Paese paese){
 
-    private void validateValues(String[] values) {
-        if (values.length < EXPECTED_COLUMNS) {
-            throw new CsvImportException(
-                    String.format("Numero di colonne non valido. Attese: %d, Trovate: %d", 
-                            EXPECTED_COLUMNS, values.length));
+        String denominazione = values[18].trim();
+
+        if (!denominazione.isEmpty()){
+            TitoloStudio titoloStudio = TitoloStudio.builder()
+                    .paese(paese)
+                    .denominazione(denominazione)
+                    .build();
+
+            titoloStudioRepository.save(titoloStudio);
+            log.debug("Creato titolo di studio: {} per il paese: {}",
+                    denominazione, paese.getNome());
+
         }
     }
 
@@ -154,7 +184,6 @@ public class CsvImportService{
     }
 
     private Integer calcolaDurataBase(String[] values) {
-        // Calcola la durata base considerando i primi 3 anni (colonne 2-4)
         try {
             return Integer.parseInt(values[4].replaceAll("[^0-9]", ""));
         } catch (NumberFormatException e) {
@@ -181,7 +210,7 @@ public class CsvImportService{
         
         if (votoNorm.matches("[A-Za-z]+")) return TipoScala.LETTERE;
         if (votoNorm.matches("[0-9.]+")) return TipoScala.NUMERICO;
-        return TipoScala.DESCRITTIVO;
+        return TipoScala.PERCENTUALE;
     }
 
     private String cleanValue(String value) {

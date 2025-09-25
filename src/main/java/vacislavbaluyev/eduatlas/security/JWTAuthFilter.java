@@ -81,8 +81,8 @@ public class JWTAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return "OPTIONS".equalsIgnoreCase(request.getMethod()) ||
-                new AntPathMatcher().match("/api/auth/**", request.getServletPath()) ||
-                (new AntPathMatcher().match("/api/paesi/**", request.getServletPath())
+                new AntPathMatcher().match("/auth/**", request.getServletPath()) ||
+                (new AntPathMatcher().match("/paesi/**", request.getServletPath())
                         && "GET".equalsIgnoreCase(request.getMethod()));
     }
 }

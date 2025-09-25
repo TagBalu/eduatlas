@@ -10,6 +10,7 @@ import vacislavbaluyev.eduatlas.exception.ResourceNotFoundException;
 import vacislavbaluyev.eduatlas.payload.DettaglioPaeseDTO;
 import vacislavbaluyev.eduatlas.payload.PaeseCompletoCreateDTO;
 import vacislavbaluyev.eduatlas.payload.PaeseCreateDTO;
+import vacislavbaluyev.eduatlas.payload.PaeseDTO;
 import vacislavbaluyev.eduatlas.repository.PaeseRepository;
 import vacislavbaluyev.eduatlas.repository.SistemaUniversitarioRepository;
 import vacislavbaluyev.eduatlas.repository.SistemaValutazioneRepository;
@@ -126,6 +127,18 @@ public class PaeseService {
                 })
                 .filter(dto -> dto != null)
                 .collect(Collectors.toList());
+    }
+
+    public List<PaeseDTO> searchPaesiByNome(String query) {
+        return paeseRepository.findByNomeContainingIgnoreCase(query).stream()
+                .map(p -> new PaeseDTO(p.getId(), p.getNome(), p.getAnniSculaObbligaroia()))
+                .collect(Collectors.toList());
+    }
+
+    public List<DettaglioPaeseDTO> confrontaPaesiByNome(String nome1, String nome2) {
+        DettaglioPaeseDTO p1 = getPaeseByNome(nome1);
+        DettaglioPaeseDTO p2 = getPaeseByNome(nome2);
+        return List.of(p1, p2);
     }
 
     @Transactional

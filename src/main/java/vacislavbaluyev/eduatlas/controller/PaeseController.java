@@ -6,13 +6,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import vacislavbaluyev.eduatlas.payload.DettaglioPaeseDTO;
 import vacislavbaluyev.eduatlas.payload.PaeseCreateDTO;
+import vacislavbaluyev.eduatlas.payload.PaeseDTO;
 import vacislavbaluyev.eduatlas.service.PaeseService;
 
 import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/paesi")
+@RequestMapping("/paesi")
 @RequiredArgsConstructor
 public class PaeseController {
     private final PaeseService paeseService;
@@ -30,6 +31,17 @@ public class PaeseController {
     @GetMapping("/nome/{nome}")
     public ResponseEntity<DettaglioPaeseDTO> getPaeseByNome(@PathVariable String nome) {
         return ResponseEntity.ok(paeseService.getPaeseByNome(nome));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<PaeseDTO>> searchPaesi(@RequestParam("q") String query) {
+        return ResponseEntity.ok(paeseService.searchPaesiByNome(query));
+    }
+
+    @GetMapping("/confronta")
+    public ResponseEntity<List<DettaglioPaeseDTO>> confrontaPaesi(@RequestParam("paese1") String paese1,
+                                                                   @RequestParam("paese2") String paese2) {
+        return ResponseEntity.ok(paeseService.confrontaPaesiByNome(paese1, paese2));
     }
 
     @GetMapping("/anni-scuola/{anni}")

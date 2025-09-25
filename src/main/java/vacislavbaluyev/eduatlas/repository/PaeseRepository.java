@@ -18,6 +18,5 @@ public interface PaeseRepository extends JpaRepository<Paese, Long> {
     @Query("SELECT p FROM Paese p WHERE p.anniSculaObbligaroia = :anni")
     List<Paese> findByAnniScuolaObbligatoria(@Param("anni") Integer anni);
 
-
-
+    List<Paese> findByNomeContainingIgnoreCase(String nome);
 }

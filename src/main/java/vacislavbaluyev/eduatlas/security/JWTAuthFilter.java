@@ -4,8 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,15 +23,11 @@ import java.util.List;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class JWTAuthFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JWTTools jwtTools;
-
-    @Autowired
-    private UtenteService utenteService;
-
-    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+    private final JWTTools jwtTools;
+    private final UtenteService utenteService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -39,66 +35,54 @@ public class JWTAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization");
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            return;
+        }
 
-        // Se il percorso è pubblico o non richiede autenticazione, procedi senza token
         if (shouldNotFilter(request)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // Verifica se l'header Authorization è presente e nel formato corretto
+        String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new UnauthorizedOperationException("Per favore inserisci il token nell'Authorization Header nel formato corretto!");
+            throw new UnauthorizedOperationException("Per favore inserisci il token nell'Authorization Header!");
         }
 
         try {
             String accessToken = authHeader.replace("Bearer ", "");
-
-            // Verifica il token
             jwtTools.verifyToken(accessToken);
+            String username = jwtTools.extractSubject(accessToken); // Modifica qui per usare username invece di id
 
-            // Estrae lo username dal token
-            String username = jwtTools.extractSubject(accessToken);
+            // Recupera l'utente usando lo username
+            UtenteDTO utente = utenteService.getUserByUsername(username);
 
-            // Recupera l'utente dal database
-            UtenteDTO currentUser = utenteService.getUserByUsername(username);
-
-            // Crea l'oggetto Authentication con i ruoli appropriati
-            List<SimpleGrantedAuthority> authorities;
-            if (currentUser.isAdmin()) {
-                authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
-            } else {
-                authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
-            }
+            // Crea l'authority basata sul ruolo dell'utente
+            List<SimpleGrantedAuthority> authorities = List.of(
+                    new SimpleGrantedAuthority("ROLE_" + utente.ruolo().name())
+            );
 
             Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    username,
-                    null,
+                    username, // username come principal
+                    null,    // credentials non necessarie qui
                     authorities
             );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
+            filterChain.doFilter(request, response);
         } catch (Exception e) {
             log.error("Errore durante l'autenticazione: {}", e.getMessage());
             throw new UnauthorizedOperationException("Token non valido o scaduto");
         }
-
-        filterChain.doFilter(request, response);
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        // Gestione delle richieste OPTIONS
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            return true;
-        }
-
-        String path = request.getServletPath();
-
-        // Lista dei percorsi pubblici
-        return pathMatcher.match("/api/auth/**", path) ||
-                (pathMatcher.match("/api/paesi/**", path) && "GET".equalsIgnoreCase(request.getMethod()));
+        return "OPTIONS".equalsIgnoreCase(request.getMethod()) ||
+                new AntPathMatcher().match("/api/auth/**", request.getServletPath()) ||
+                (new AntPathMatcher().match("/api/paesi/**", request.getServletPath())
+                        && "GET".equalsIgnoreCase(request.getMethod()));
     }
 }

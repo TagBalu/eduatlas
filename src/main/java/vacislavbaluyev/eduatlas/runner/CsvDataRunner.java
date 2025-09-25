@@ -2,6 +2,7 @@ package vacislavbaluyev.eduatlas.runner;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,9 @@ public class CsvDataRunner implements CommandLineRunner {
         this.passwordEncoder = passwordEncoder;
         this.csvImportService = csvImportService;
     }
+
+    @Value("${admin.root.password}")
+    private String adminRootPassword;
 
     @Override
     public void run(String... args) {
@@ -72,7 +76,7 @@ public class CsvDataRunner implements CommandLineRunner {
         if (utenteRepository.count() == 0) {
             log.info("Creazione utente admin root...");
 
-            String encodedPassword = passwordEncoder.encode("adminRoot123!");
+            String encodedPassword = passwordEncoder.encode(adminRootPassword);
 
             Utente adminRoot = Utente.builder()
                     .username("admin")

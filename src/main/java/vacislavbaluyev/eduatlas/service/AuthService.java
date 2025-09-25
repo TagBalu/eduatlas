@@ -36,15 +36,16 @@ public class AuthService {
     }
 
     public LoginResponseDTO login(LoginDTO loginDto) {
-        // Autenticazione dell'utente
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginDto.username(), loginDto.password())
-        );
-
-        // Recupero dell'utente e generazione token
+        // Recupera l'utente
         Utente utente = utenteRepository.findByUsername(loginDto.username())
                 .orElseThrow(() -> new ResourceNotFoundException("Utente non trovato"));
 
+        // Verifica la password senza usare AuthenticationManager (non abbiamo un UserDetailsService configurato)
+        if (!passwordEncoder.matches(loginDto.password(), utente.getPassword())) {
+            throw new UnauthorizedOperationException("Credenziali non valide");
+        }
+
+        // Genera il token JWT
         String token = jwtTools.generateToken(utente);
 
         return new LoginResponseDTO(

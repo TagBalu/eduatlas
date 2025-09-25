@@ -38,7 +38,7 @@ public class SecurityConfig {
 
         httpSecurity.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/paesi/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/paesi/**").permitAll()
                 .anyRequest().authenticated()
         );
 

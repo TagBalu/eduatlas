@@ -140,21 +140,47 @@ public class PaeseService {
         DettaglioPaeseDTO p2 = getPaeseByNome(nome2);
         return List.of(p1, p2);
     }
-
     @Transactional
     public DettaglioPaeseDTO createPaese(PaeseCreateDTO createDTO) {
-        // Convertiamo PaeseCreateDTO in PaeseCompletoCreateDTO
-        PaeseCompletoCreateDTO completeDTO = new PaeseCompletoCreateDTO(
-                createDTO.nome(),
-                createDTO.anniScuolaObbligatoria(),
-                null, null, null, null,  // sistema valutazione vuoto
-                null, null, null        // sistema universitario vuoto
+        // Verifica se esiste già un paese con lo stesso nome
+        if (paeseRepository.existsByNome(createDTO.nome())) {
+            throw new IllegalArgumentException("Un paese con questo nome esiste già");
+        }
+
+        // 1. Crea il paese
+        Paese paese = paeseRepository.save(Paese.builder()
+                .nome(createDTO.nome())
+                .anniSculaObbligaroia(createDTO.anniScuolaObbligatoria())
+                .build());
+
+        // 2. Crea il sistema di valutazione
+        SistemaValutazione sistemaValutazione = SistemaValutazione.builder()
+                .paese(paese)
+                .votoA(createDTO.votoA())
+                .votoB(createDTO.votoB())
+                .votoC(createDTO.votoC())
+                .votoDE(createDTO.votoDE())
+                .votoF(createDTO.votoF())
+                .scalaTipo(createDTO.scalaTipo())
+                .build();
+        sistemaValutazioneRepository.save(sistemaValutazione);
+
+        // 3. Crea il sistema universitario
+        SistemaUniversitario sistemaUniversitario = SistemaUniversitario.builder()
+                .paese(paese)
+                .durataBaseAnni(createDTO.durataBaseanni())
+                .creditiPerAnno(createDTO.creditiPerAnno())
+                .livelloEQF(createDTO.livelloEQF())
+                .build();
+        sistemaUniversitarioRepository.save(sistemaUniversitario);
+
+        // Restituisce il DTO completo
+        return DettaglioPaeseDTO.fromEntities(
+                paese,
+                sistemaValutazione,
+                sistemaUniversitario
         );
-
-        Paese paese = paeseCompletoService.createPaeseCompleto(completeDTO);
-        return getPaeseById(paese.getId());
     }
-
     @Transactional
     public void deletePaese(Long id) {
         if (!paeseRepository.existsById(id)) {

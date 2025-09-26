@@ -38,8 +38,9 @@ public class SecurityConfig {
 
         httpSecurity.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/paesi/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/paesi/**").hasAnyRole("ADMIN", "ROOT_ADMIN")
+                .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/paesi/**").hasAnyRole("ADMIN", "ROOT_ADMIN")
                 .anyRequest().authenticated()
         );
 
@@ -55,16 +56,31 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:3001"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+
+        // Permetti specificamente l'origine di Vite
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+
+        // Metodi HTTP permessi
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+
+        // Headers permessi
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin"
+        ));
+
+        // Headers esposti
         configuration.setExposedHeaders(List.of("Authorization"));
+
+        // Permetti le credenziali
         configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();

@@ -15,7 +15,7 @@ import java.security.Principal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/utenti")
+@RequestMapping("/admin")
 @RequiredArgsConstructor
 public class UtenteController {
     private final UtenteService utenteService;
@@ -50,12 +50,20 @@ public class UtenteController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/admin/create")
+    @PostMapping("/create")
     @PreAuthorize("hasRole('ROOT_ADMIN')")
     public ResponseEntity<String> createAdmin(
             @Valid @RequestBody AdminCreationDTO adminDTO,
             Principal principal) {
         authService.createAdmin(adminDTO, principal.getName());
         return ResponseEntity.ok("Admin creato con successo");
+    }
+    @DeleteMapping("delete/username/{username}")
+    @PreAuthorize("hasRole('ROOT_ADMIN')")
+    public ResponseEntity<Void> deleteAdminByUsername(
+            @PathVariable String username,
+            Principal principal) {
+        utenteService.deleteAdminByUsername(username, principal.getName());
+        return ResponseEntity.noContent().build();
     }
 }

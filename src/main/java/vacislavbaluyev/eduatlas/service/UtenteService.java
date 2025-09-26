@@ -138,4 +138,37 @@ public class UtenteService {
                 utente.getRuolo()
         );
     }
+
+    public void deleteAdmin(Long id, String requestingUsername) {
+        // Trova l'utente che fa la richiesta
+        Utente requestingUser = utenteRepository.findByUsername(requestingUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("Utente richiedente non trovato"));
+
+        // Verifica che l'utente richiedente sia ROOT_ADMIN
+        if (requestingUser.getRuolo() != Ruolo.ROOT_ADMIN) {
+            throw new UnauthorizedOperationException("Solo i ROOT_ADMIN possono eliminare gli admin");
+        }
+
+        // Trova l'utente da eliminare
+        Utente targetUser = utenteRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin non trovato con id: " + id));
+
+        // Verifica che l'utente da eliminare sia un ADMIN (non ROOT_ADMIN)
+        if (targetUser.getRuolo() != Ruolo.ADMIN) {
+            if (targetUser.getRuolo() == Ruolo.ROOT_ADMIN) {
+                throw new UnauthorizedOperationException("Non è possibile eliminare un ROOT_ADMIN");
+            } else {
+                throw new UnauthorizedOperationException("L'utente selezionato non è un admin");
+            }
+        }
+
+        // Verifica che l'admin non stia cercando di eliminare se stesso
+        if (targetUser.getUsername().equals(requestingUsername)) {
+            throw new UnauthorizedOperationException("Non puoi eliminare te stesso");
+        }
+
+        // Procedi con l'eliminazione
+        utenteRepository.delete(targetUser);
+        log.info("Admin {} eliminato da {}", targetUser.getUsername(), requestingUsername);
+    }
 }

@@ -58,4 +58,13 @@ public class UtenteController {
         authService.createAdmin(adminDTO, principal.getName());
         return ResponseEntity.ok("Admin creato con successo");
     }
+    @DeleteMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ROOT_ADMIN')")
+    public ResponseEntity<Void> deleteAdmin(
+            @PathVariable Long id,
+            Principal principal) {
+        utenteService.deleteAdmin(id, principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
 }

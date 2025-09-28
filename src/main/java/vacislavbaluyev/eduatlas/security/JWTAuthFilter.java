@@ -46,8 +46,10 @@ public class JWTAuthFilter extends OncePerRequestFilter {
         }
 
         String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new UnauthorizedOperationException("Per favore inserisci il token nell'Authorization Header!");
+        // Se è una richiesta pubblica e non c'è token, lasciamo passare
+        if (isPublicEndpoint(request) && (authHeader == null || !authHeader.startsWith("Bearer "))) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
         try {
@@ -81,8 +83,17 @@ public class JWTAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return "OPTIONS".equalsIgnoreCase(request.getMethod()) ||
-                new AntPathMatcher().match("/api/auth/**", request.getServletPath()) ||
-                (new AntPathMatcher().match("/api/paesi/**", request.getServletPath())
+                new AntPathMatcher().match("/auth/**", request.getServletPath()) ||
+                (new AntPathMatcher().match("/paesi/**", request.getServletPath())
                         && "GET".equalsIgnoreCase(request.getMethod()));
     }
+
+    private boolean isPublicEndpoint(HttpServletRequest request) {
+        String path = request.getServletPath();
+        String method = request.getMethod();
+
+        return (path.startsWith("/auth/") ||
+                (path.startsWith("/paesi/") && "GET".equalsIgnoreCase(method)));
+    }
+
 }
